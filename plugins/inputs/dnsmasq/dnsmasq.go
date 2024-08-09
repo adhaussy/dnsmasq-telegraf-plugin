@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"os"
 
 	"github.com/miekg/dns"
 
@@ -42,8 +43,13 @@ func (d *Dnsmasq) Description() string {
 func (d *Dnsmasq) Gather(acc telegraf.Accumulator) error {
 	d.setDefaultValues()
 	fields := make(map[string]interface{}, 2)
+	hostname, err := os.Hostname()
+	if err != nil {
+		return fmt.Errorf("Failed to get hostname:" , err)
+	}
 	tags := map[string]string{
 		"server": d.Server,
+		"host": strings.Split(hostname, ".")[0],
 	}
 	metrics := []string{
 		"cachesize.bind.",
