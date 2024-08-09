@@ -45,26 +45,41 @@ func (d *Dnsmasq) Gather(acc telegraf.Accumulator) error {
 	tags := map[string]string{
 		"server": d.Server,
 	}
-	msg := &dns.Msg{
-		MsgHdr: dns.MsgHdr{
-			Id:               dns.Id(),
-			RecursionDesired: true,
-		},
-		Question: []dns.Question{
-			question("cachesize.bind."),
-			question("insertions.bind."),
-			question("evictions.bind."),
-			question("misses.bind."),
-			question("hits.bind."),
-			question("auth.bind."),
-			question("servers.bind."),
-		},
+	metrics := []string{
+		"cachesize.bind.",
+		"insertions.bind.",
+		"evictions.bind.",
+		"misses.bind.",
+		"hits.bind.",
+		"auth.bind.",
+		"servers.bind.",
 	}
-	in, _, err := d.c.Exchange(msg, d.Server)
-	if err != nil {
-		return err
+	for _, metricName := range metrics {
+		msg := &dns.Msg{
+			MsgHdr: dns.MsgHdr{
+				Id:               dns.Id(),
+				RecursionDesired: true,
+			},
+			Question: []dns.Question{
+				question(metricName),
+			},
+		}
+		in, _, err := d.c.Exchange(msg, d.Server)
+		if err != nil {
+			return err
+		}
+		err = processResponse(in, metricName, fields)
+		if err != nil {
+			return err
+		}
 	}
-	for _, a := range in.Answer {
+
+	acc.AddFields("dnsmasq", fields, tags)
+	return nil
+}
+
+func processResponse(response *dns.Msg, metricName string, fields map[string]interface{}) error {
+	for _, a := range response.Answer {
 		txt, ok := a.(*dns.TXT)
 		if !ok {
 			continue
@@ -101,8 +116,6 @@ func (d *Dnsmasq) Gather(acc telegraf.Accumulator) error {
 			}
 		}
 	}
-
-	acc.AddFields("dnsmasq", fields, tags)
 	return nil
 }
 
